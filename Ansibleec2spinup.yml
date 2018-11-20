@@ -1,0 +1,53 @@
+--- # Playbook for ec2 spinup 
+- hosts: localhost
+  connection: local
+  gather_facts: no
+  tasks:
+  - name: Create a Security Group
+    ec2_group:
+      name: mphpsg
+      description: Security group
+      vpc_id: vpc-01cb9d56782523275
+      rules:
+        - proto: tcp
+          from_port: 80
+          to_port: 80
+          cidr_ip: 0.0.0.0/0
+        - proto: tcp
+          from_port: 22
+          to_port: 22
+          cidr_ip: 0.0.0.0/0
+        - proto: tcp
+          from_port: 443
+          to_port: 443
+          cidr_ip: 0.0.0.0/0
+        - proto: tcp
+          from_port: 3306
+          to_port: 3306
+          cidr_ip: 0.0.0.0/0
+       
+      rules_egress:
+         - proto: all
+           cidr_ip: 0.0.0.0/0
+    register: sg_out         
+
+  - name:launching ec2 instance
+    ec2:
+      key_name: "newabc1"
+      image: ami-0782e9ee97725263d
+      instance_type: t2.micro
+      vpc_subnet_id: subnet-01bc2f29ddfde326e
+      count: 1
+      assign_public_ip: yes
+      group: myphpsg
+      instance_tags:
+        Name: PHP
+      wait: yes
+    register: ec2_out
+
+  - name: wait for ssh to come up
+    wait_for:
+      host={{ item.public_ip }}
+      port=22
+      state=started
+    with_items: '{{ ec2_out.instances }}'
